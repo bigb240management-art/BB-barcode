@@ -1,0 +1,51 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Barcode Generator Offline</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:18px;font-family:Arial;background:#f3f4f6}.app{max-width:900px;margin:auto;background:#fff;padding:24px;border-radius:20px;box-shadow:0 10px 35px #0002}h1{text-align:center;margin:0 0 5px}.sub{text-align:center;color:#666;margin:0 0 22px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.box{border:1px solid #ddd;border-radius:16px;padding:22px 10px;background:#fff;text-align:center;min-height:120px;font-size:17px;font-weight:bold}.box small{display:block;color:#777;font-size:11px;margin-top:8px;font-weight:normal}.nav{display:flex;gap:10px;align-items:center;margin-bottom:18px}.nav button,.controls button,.print{border:0;border-radius:10px;padding:12px 16px;background:#111827;color:#fff;font-weight:bold}.title{font-size:21px;font-weight:bold;flex:1}.card{border:1px solid #ddd;border-radius:14px;padding:15px;text-align:center}.value{font-size:24px;font-weight:bold;margin:12px 0;letter-spacing:1px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.prev{background:#6b7280!important}.print{width:100%;margin-top:10px;background:#2563eb}.qty{text-align:center;margin:14px 0;padding:10px;background:#f8fafc;border-radius:10px}.qty input{width:80px;padding:7px;text-align:center;font-size:16px}.note{text-align:center;color:#777;font-size:12px;line-height:1.5}.hidden{display:none!important}#printArea{display:none}.a4{width:210mm;height:297mm;padding:8mm;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(10,1fr);gap:2mm;background:#fff}.item{border:1px solid #bbb;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}.item svg{width:88mm;max-width:100%;height:19mm;display:block}.item div{font-size:10px;font-weight:bold;margin-top:1mm}.card #current{width:100%;max-width:100%;height:auto;display:block}@media(max-width:600px){.grid{grid-template-columns:1fr 1fr}.box{font-size:14px}}@media print{body{padding:0;margin:0;background:#fff}.app{display:none!important}#printArea{display:block!important}@page{size:A4 portrait;margin:0}.a4{page-break-after:always}}
+</style></head><body>
+<div class="app">
+<section id="home"><h1>Barcode Generator</h1><p class="sub">100% Offline</p><div class="grid">
+<button class="box" onclick="openCat('crate')">📦 Crate<small>GP25-PU-BC-A0001</small></button>
+<button class="box" onclick="openCat('insulated')">👜 Insulated Bag<small>GP25-IN-IBG-E6801</small></button>
+<button class="box" onclick="openCat('gel')">🧊 Gel Pad<small>PCM-BLU-SM-C8036</small></button>
+<button class="box" onclick="openCat('hazardous')">⚠️ Hazardous Bags<small>PBHM-0000000001</small></button>
+<button class="box" onclick="openCat('bbnow')">🟨 BBNOW<small>BB00000001</small></button>
+<button class="box" onclick="openCat('small')">🛍 Small Bag<small>PBS-0000000001</small></button>
+<button class="box" onclick="openCat('medium')">🛍 Medium Bag<small>PBM-0000000001</small></button>
+<button class="box" onclick="openCat('large')">🛍 Large Bag<small>PBL-0000000001</small></button>
+</div><p class="note">Select a category to generate, go forward/backward, or print.</p></section>
+
+<section id="generator" class="hidden"><div class="nav"><button onclick="goHome()">← Home</button><div class="title" id="title"></div></div>
+<div class="card"><svg id="current"></svg><div class="value" id="value"></div></div>
+<div class="controls"><button class="prev" onclick="previous()">← Previous</button><button onclick="next()">Next →</button></div>
+<div class="qty">Print quantity: <input id="qty" type="number" min="1" max="20" value="20"></div>
+<button class="print" onclick="printCodes()">🖨 Print Barcodes on A4</button>
+<p class="note" id="note"></p></section></div>
+<div id="printArea"><div class="a4" id="page"></div></div>
+
+<script>
+const EXPIRY_DAYS=30, EXPIRY_KEY="BARCODE_APP_START";
+const C={
+crate:{title:"Crate",fixed:true,start:1,count:20,make:n=>"GP25-PU-BC-A"+String(n).padStart(4,"0"),note:"20 values matching your sheet: GP25-PU-BC-A0001 to A0020."},
+insulated:{title:"Insulated Bag",fixed:true,start:6801,count:20,make:n=>"GP25-IN-IBG-E"+n,note:"20 values matching your sheet: E6801 to E6820."},
+gel:{title:"Gel Pad",fixed:true,start:8036,count:20,make:n=>"PCM-BLU-SM-C"+n,note:"20 values matching your sheet: C8036 to C8055."},
+hazardous:{title:"Hazardous Bags",start:1,make:n=>"PBHM-"+String(n).padStart(10,"0"),note:"Format: PBHM-0000000001."},
+bbnow:{title:"BBNOW",start:1,make:n=>"BB"+String(n).padStart(8,"0"),note:"Format: BB00000001."},
+small:{title:"Small Bag",start:1,make:n=>"PBS-"+String(n).padStart(10,"0"),note:"Format: PBS-0000000001."},
+medium:{title:"Medium Bag",start:1,make:n=>"PBM-"+String(n).padStart(10,"0"),note:"Format: PBM-0000000001."},
+large:{title:"Large Bag",start:1,make:n=>"PBL-"+String(n).padStart(10,"0"),note:"Format: PBL-0000000001."}
+};
+let cat=null,n=1;
+function expiry(){let s=localStorage.getItem(EXPIRY_KEY);if(!s){s=Date.now();localStorage.setItem(EXPIRY_KEY,s)}if(Date.now()>=+s+EXPIRY_DAYS*86400000){document.body.innerHTML='<h1 style="font-family:Arial;text-align:center;margin-top:60px">Page Expired</h1>';return false}return true}
+const P=["212222","222122","222221","121223","121322","131222","122213","122312","132212","221213","221312","231212","112232","122132","122231","113222","123122","123221","223211","221132","221231","213212","223112","312131","311222","321122","321221","312212","322112","322211","212123","212321","232121","111323","131123","131321","112313","132113","132311","211313","231113","231311","112133","112331","132131","113123","113321","133121","313121","211331","231131","213113","213311","213131","311123","311321","331121","312113","312311","332111","314111","221411","431111","111224","111422","121124","121421","141122","141221","112214","112412","122114","122411","142112","142211","241211","221114","413111","241112","134111","111242","121142","121241","114212","124112","124211","411212","421112","421211","212141","214121","412121","111143","111341","131141","114113","114311","411113","411311","113141","114131","311141","411131","211412","211214","211232","2331112"];
+function vals(t){let a=[104],s=104;for(let i=0;i<t.length;i++)a.push(t.charCodeAt(i)-32);for(let i=1;i<a.length;i++)s+=a[i]*i;a.push(s%103,106);return a}
+function svg(t,w,h){let a=vals(t),m=0;for(const v of a)for(const c of P[v])m+=+c;let sc=w/(m+20),x=10*sc,b=1,r="";for(const v of a)for(const c of P[v]){let z=+c;if(b)r+=`<rect x="${x.toFixed(2)}" y="0" width="${(z*sc).toFixed(2)}" height="${h}" fill="#000"/>`;x+=z*sc;b=!b}return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${r}</svg>`}
+function key(){return"BC_"+cat.toUpperCase()}
+function openCat(k){if(!expiry())return;cat=k;let c=C[k],s=localStorage.getItem(key());n=s===null?c.start:+s;home.classList.add("hidden");generator.classList.remove("hidden");title.textContent=c.title;note.textContent=c.note;show()}
+function goHome(){generator.classList.add("hidden");home.classList.remove("hidden")}
+function show(){if(!expiry())return;let c=C[cat],v=c.make(n);value.textContent=v;let d=document.createElement("div");d.innerHTML=svg(v,390,90);let x=d.firstChild;x.id="current";current.replaceWith(x)}
+function save(){localStorage.setItem(key(),n);show()}
+function next(){let c=C[cat];if(c.fixed&&n>=c.start+c.count-1){alert("Last barcode in this sheet range.");return}if(!c.fixed&&n>=9999999999){alert("Maximum reached.");return}n++;save()}
+function previous(){let c=C[cat];if(n<=c.start){alert("Already at the first barcode.");return}n--;save()}
+function printCodes(){if(!expiry())return;let c=C[cat],q=Math.max(1,Math.min(20,+document.getElementById("qty").value||1));if(c.fixed)q=Math.min(q,c.start+c.count-n);page.innerHTML="";for(let i=0;i<q;i++){let v=c.make(n+i),it=document.createElement("div");it.className="item";it.innerHTML=svg(v,82,45)+`<div>${v}</div>`;page.appendChild(it)}setTimeout(()=>print(),200)}
+expiry();
+</script></body></html>
